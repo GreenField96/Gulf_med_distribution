@@ -9,8 +9,16 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable([
+        'name',
+        'email',
+        'password',
+        'phone_num',
+        'role_permission',
+        'company_id',])]
+
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -22,6 +30,25 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role_permission === 'admin_user';
+    }
+
+    public function isCompanyMember(): bool
+    {
+        return $this->role_permission === 'companies_members';
+    }
+
+    public function isOperator(): bool
+    {
+        return $this->role_permission === 'medical_distro_operator_user';
+    }
     protected function casts(): array
     {
         return [

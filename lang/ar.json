@@ -1,0 +1,22 @@
+{
+    "Companies": "الشركات",
+    "Company": "الشركة",
+    "Company Name": "اسم الشركة",
+    "Members": "الأعضاء",
+    "Member": "العضو",
+    "First Name": "الاسم الأول",
+    "Last Name": "اسم العائلة",
+    "Member ID": "رقم العضوية",
+    "National ID": "الرقم الوطني",
+    "Family ID": "رقم الكتيب / العائلة",
+    "Phone Number": "رقم الهاتف",
+    "Chronic Disease Document": "تقرير الأمراض المزمنة (PDF)",
+    "Medications": "الأدوية",
+    "Medical Name": "اسم الدواء",
+    "Dosages": "الجرعة",
+    "Amount": "الكمية",
+    "Price": "السعر",
+    "Monthly Distribution": "تأكيد الاستلام الشهرية",
+    "Confirmed": "تم الاستلام",
+    "Not Confirmed": "لم يتم الاستلام"
+}
