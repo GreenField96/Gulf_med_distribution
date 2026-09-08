@@ -9,6 +9,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use BackedEnum;
+use App\Filament\Resources\Members\RelationManagers\MedicationAndDosagesRelationManager;
 
 class MemberResource extends Resource
 {
@@ -35,6 +36,12 @@ class MemberResource extends Resource
                     ->icon('heroicon-o-document-text')
                     ->url(fn ($record) => $record->reference_to_pdf ? asset('storage/' . $record->reference_to_pdf) : null, true),
             ]);
+    }
+    public static function getRelations(): array
+    {
+        return [
+            MedicationAndDosagesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
