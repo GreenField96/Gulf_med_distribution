@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Policies;
 
 use App\Models\Member;
@@ -7,7 +8,8 @@ use App\Models\User;
 class MemberPolicy
 {
     /**
-     * Admins, Operators, and Company Users can view members.
+     * Admin and Medical Operators can view any member.
+     * Company Members can only view members belonging to their company.
      */
     public function viewAny(User $user): bool
     {
@@ -16,41 +18,27 @@ class MemberPolicy
 
     public function view(User $user, Member $member): bool
     {
-        if ($user->isAdmin() || $user->isOperator()) {
+        if ($user->isAdmin() || $user->isMedicalOperator()) {
             return true;
         }
 
-        // Company members can only view members of their own company
         return $user->company_id === $member->company_id;
     }
 
-    /**
-     * Admins and Company Users can create members.
-     */
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isCompanyMember();
+        return $user->isAdmin() || $user->isMedicalOperator() || $user->isCompanyMember();
     }
 
-    /**
-     * Admins and Company Users can edit members (upload new PDFs).
-     */
     public function update(User $user, Member $member): bool
     {
-        if ($user->isAdmin()) {
+        if ($user->isAdmin() || $user->isMedicalOperator()) {
             return true;
         }
 
-        if ($user->isCompanyMember()) {
-            return $user->company_id === $member->company_id;
-        }
-
-        return false;
+        return $user->company_id === $member->company_id;
     }
 
-    /**
-     * Only admins can delete members.
-     */
     public function delete(User $user, Member $member): bool
     {
         return $user->isAdmin();
