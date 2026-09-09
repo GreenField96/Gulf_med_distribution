@@ -14,12 +14,12 @@ class MemberForm
         return $schema
             ->components([
                 Select::make('company_id')
-                    ->relationship('company', 'company_name')
-                    ->label(__('Company'))
-                    ->required()
-                    ->default(fn () => auth()->user()->company_id ?? null)
-                    ->disabled(fn () => auth()->user()->isCompanyMember()),
-
+    ->label(__('Company'))
+    ->relationship('company', 'company_name')
+    ->required()
+    ->default(fn () => auth()->user()?->company_id)
+    ->disabled(fn () => auth()->user()?->isCompanyMember())
+    ->dehydrated(), // Ensures the value is still submitted to the database when disabled
                 TextInput::make('first_name')
                     ->label(__('First Name'))
                     ->required(),

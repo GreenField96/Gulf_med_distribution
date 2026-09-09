@@ -12,11 +12,17 @@
     "Phone Number": "رقم الهاتف",
     "Chronic Disease Document": "تقرير الأمراض المزمنة (PDF)",
     "Medications": "الأدوية",
+    "Medication": "دواء",
     "Medical Name": "اسم الدواء",
     "Dosages": "الجرعة",
     "Amount": "الكمية",
     "Price": "السعر",
     "Monthly Distribution": "تأكيد الاستلام الشهرية",
     "Confirmed": "تم الاستلام",
-    "Not Confirmed": "لم يتم الاستلام"
+    "Not Confirmed": "لم يتم الاستلام",
+    "Document" : "الوتيقة",
+    "Users" : "المستخدمين",
+    "User" : "مستخدم",
+    "Monthly Tracking" : "تتبع الأستلام شهريا",
+    "Monthly Trackings" : "استلام شهريا"
 }

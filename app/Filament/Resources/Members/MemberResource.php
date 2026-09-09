@@ -17,6 +17,19 @@ class MemberResource extends Resource
     // protected static ?string $navigationIcon = 'heroicon-o-user-group';
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
 
+    public static function getNavigationLabel(): string
+    {
+    return __('Members');
+    }
+    public static function getModelLabel(): string
+    {
+    return __('Member');
+    }
+        public static function getPluralModelLabel(): string
+    {
+        return __('Members');
+    }
+
     public static function form(Schema $schema): Schema
     {
         return MemberForm::configure($schema);

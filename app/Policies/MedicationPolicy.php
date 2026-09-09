@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Policies;
 
 use App\Models\Medication;
@@ -16,21 +17,18 @@ class MedicationPolicy
         return true;
     }
 
-    /**
-     * Admins and Medical Operators can manage medications and dosages.
-     */
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isOperator();
+        return $user->isAdmin() || $user->isMedicalOperator();
     }
 
     public function update(User $user, Medication $medication): bool
     {
-        return $user->isAdmin() || $user->isOperator();
+        return $user->isAdmin() || $user->isMedicalOperator();
     }
 
     public function delete(User $user, Medication $medication): bool
     {
-        return $user->isAdmin() || $user->isOperator();
+        return $user->isAdmin();
     }
 }

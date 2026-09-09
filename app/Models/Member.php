@@ -3,7 +3,6 @@
 namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
 use Illuminate\Database\Eloquent\Model;
 
 class Member extends Model
@@ -31,9 +30,12 @@ class Member extends Model
 
     public function medicationDosages(): HasMany
     {
-        return $this->hasMany(MedicationAndDosage::class);
+        return $this->belongsTo(MedicationAndDosage::class, 'member_id');
     }
-
+    public function medicationAndDosages(): HasMany
+    {
+        return $this->hasMany(MedicationAndDosage::class, 'member_id');
+    }
     public function distributionDates(): HasMany
     {
         return $this->hasMany(DateWhenMemberTakeHisMedical::class);

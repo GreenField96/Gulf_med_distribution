@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        chema::create('dates_when_member_take_his_medicals', function (Blueprint $table) {
+        schema::create('dates_when_member_take_his_medicals', function (Blueprint $table) {
             $table->id();
             $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
             $table->string('date_month_year'); // e.g. "09/2026"

@@ -12,15 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('phone_num')->nullable()->after('password');
-            $table->enum('role_permission', ['admin_user', 'companies_members', 'medical_distro_operator_user'])
-                  ->default('companies_members')
-                  ->after('phone_num');
-            $table->foreignId('company_id')
-                  ->nullable()
-                  ->after('role_permission')
-                  ->constrained('companies')
-                  ->nullOnDelete(); // null = all access across all companies
+            if (! Schema::hasColumn('users', 'phone_num')) {
+                $table->string('phone_num')->nullable()->after('password');
+            }
+
+            if (! Schema::hasColumn('users', 'company_id')) {
+                $table->foreignId('company_id')->nullable()->constrained('companies')->nullOnDelete();
+            }
+
+            if (! Schema::hasColumn('users', 'role')) {
+                $table->string('role')->default('companies_members');
+            }
         });
     }
 

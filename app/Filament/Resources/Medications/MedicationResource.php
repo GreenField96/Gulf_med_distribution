@@ -15,7 +15,18 @@ class MedicationResource extends Resource
     protected static ?string $model = Medication::class;
     // protected static ?string $navigationIcon = 'heroicon-o-beaker';
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
-
+    public static function getNavigationLabel(): string
+    {
+            return __('Medications');
+    }
+    public static function getModelLabel(): string
+    {
+        return __('Medication');
+    }
+        public static function getPluralModelLabel(): string
+    {
+        return __('Medications');
+    }
     public static function form(Schema $schema): Schema
     {
         return MedicationForm::configure($schema);
