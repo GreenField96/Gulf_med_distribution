@@ -14,6 +14,21 @@ use Filament\Tables\Table;
 
 class MedicationAndDosagesRelationManager extends RelationManager
 {
+    public static function getNavigationLabel(): string
+    {
+        return __('Medication And Dosages');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return __('Medication And Dosage');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('Medication And Dosages');
+    }
+
     protected static string $relationship = 'medicationAndDosages';
 
     public function form(Schema $schema): Schema
@@ -32,12 +47,6 @@ class MedicationAndDosagesRelationManager extends RelationManager
                     ->placeholder('e.g., 1 , 2')
                     ->rule('gt:0')
                     ->required(),
-
-                // TextInput::make('price')
-                //     ->label(__('Price'))
-                //     ->numeric()
-                //     ->prefix('LYD')
-                //     ->required(),
             ]);
     }
 
@@ -52,14 +61,14 @@ class MedicationAndDosagesRelationManager extends RelationManager
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label(__('Amount')),
-                    Tables\Columns\TextColumn::make('total_price')
+
+                Tables\Columns\TextColumn::make('total_price')
                     ->label(__('Total Price'))
                     ->getStateUsing(function ($record) {
                         $unitPrice = $record->medication?->price ?? 0;
                         return $record->amount * $unitPrice;
                     })
                     ->money('LYD'),
-
             ])
             ->headerActions([
                 CreateAction::make(),

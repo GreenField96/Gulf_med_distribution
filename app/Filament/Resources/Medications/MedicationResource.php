@@ -51,6 +51,7 @@ class MedicationResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')
+                    ->label(__('Created at'))
                     ->dateTime()
                     ->sortable(),
             ]);

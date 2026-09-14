@@ -27,6 +27,11 @@ class MonthlyTrackingResource extends Resource
     {
         return auth()->check();
     }
+    
+    // public static function canCreate(): bool
+    // {
+    //     return false;
+    // }
 
     public static function getNavigationLabel(): string
     {
@@ -42,13 +47,16 @@ class MonthlyTrackingResource extends Resource
     {
         return __('Monthly Trackings');
     }
+    
+
 
     public static function getEloquentQuery(): Builder
     {
         $currentMonth = Carbon::now()->startOfMonth()->toDateString();
         static::ensureMonthlyRecordsExist($currentMonth);
 
-        return parent::getEloquentQuery();
+        // Eager load the member relationship to check 'is_locked' efficiently
+        return parent::getEloquentQuery()->with('member');
     }
 
     public static function form(Schema $schema): Schema
@@ -57,7 +65,8 @@ class MonthlyTrackingResource extends Resource
             ->components([
                 Toggle::make('is_taken')
                     ->label(__('Is Taken'))
-                    ->default(false),
+                    ->default(false)
+                    ->disabled(fn ($record) => $record?->member?->is_locked ?? false),
 
                 Select::make('confirmed_by_user_id')
                     ->label(__('Confirmed By'))
@@ -67,7 +76,8 @@ class MonthlyTrackingResource extends Resource
             ]);
     }
 
-    public static function table(Table $table): Table
+
+public static function table(Table $table): Table
     {
         return $table
             ->columns([
@@ -93,14 +103,27 @@ class MonthlyTrackingResource extends Resource
                 Tables\Columns\CheckboxColumn::make('is_taken')
                     ->label(__('Medical Taken'))
                     ->disabled(function ($record) {
+                        /** @var \App\Models\User $user */
+                        $user = auth()->user();
+
+                        // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
+                        if (!$user || !($user->isAdmin() || $user->isMedicalOperator())) {
+                            return true;
+                        }
+
                         if (!$record || !$record->date_month_year) {
+                            return true;
+                        }
+
+                        // 2. Disable if member is locked due to PDF/document change
+                        if ($record->member && $record->member->is_locked) {
                             return true;
                         }
 
                         $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
                         $currentMonth = Carbon::now()->startOfMonth();
 
-                        // Lock modifications if the record belongs to a past month
+                        // 3. Lock modifications if the record belongs to a past month
                         return $selectedMonth->lt($currentMonth);
                     })
                     ->beforeStateUpdated(function ($record, $state) {
@@ -108,6 +131,19 @@ class MonthlyTrackingResource extends Resource
                             'confirmed_by_user_id' => $state ? auth()->id() : null,
                         ]);
                     }),
+
+                // Lock Warning Note Column
+                Tables\Columns\TextColumn::make('lock_status')
+                    ->label(__('Note'))
+                    ->getStateUsing(function ($record) {
+                        if ($record->member && $record->member->is_locked) {
+                            return __('Please adjust Member medications');
+                        }
+                        return null;
+                    })
+                    ->badge()
+                    ->color('danger')
+                    ->wrap(),
 
                 Tables\Columns\TextColumn::make('confirmedBy.name')
                     ->label(__('Confirmed By'))
@@ -137,12 +173,7 @@ class MonthlyTrackingResource extends Resource
                         return $query->whereDate('date_month_year', $selectedMonth);
                     }),
             ])
-            ->actions([
-                EditAction::make()
-                    ->disabled(fn ($record) => Carbon::parse($record->date_month_year)->startOfMonth()->lt(Carbon::now()->startOfMonth())),
-                DeleteAction::make()
-                    ->disabled(fn ($record) => Carbon::parse($record->date_month_year)->startOfMonth()->lt(Carbon::now()->startOfMonth())),
-            ]);
+            ->actions([]);
     }
 
     /**

@@ -17,6 +17,7 @@ class Member extends Model
         'family_ID',
         'phone_num',
         'reference_to_pdf',
+        'is_locked',
     ];
     protected static function booted(): void
     {
@@ -30,6 +31,14 @@ class Member extends Model
                 'is_taken' => false,
                 'confirmed_by_user_id' => null,
             ]);
+            $member->is_locked = 1;
+        });
+        // 2. Set is_locked to 1 when an existing member's document/PDF is edited
+        static::updating(function (Member $member) {
+            // Checks if the document/PDF column was modified in this save attempt
+            if ($member->isDirty('reference_to_pdf')) {
+                $member->is_locked = 1;
+            }
         });
     }
 

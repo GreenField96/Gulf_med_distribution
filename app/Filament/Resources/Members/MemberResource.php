@@ -10,22 +10,26 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use BackedEnum;
 use App\Filament\Resources\Members\RelationManagers\MedicationAndDosagesRelationManager;
+// use Filament\Tables\Actions\Action;
+use Illuminate\Support\Facades\Storage;
+use Filament\Actions\Action;
 
 class MemberResource extends Resource
 {
     protected static ?string $model = Member::class;
-    // protected static ?string $navigationIcon = 'heroicon-o-user-group';
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
 
     public static function getNavigationLabel(): string
     {
-    return __('Members');
+        return __('Members');
     }
+
     public static function getModelLabel(): string
     {
-    return __('Member');
+        return __('Member');
     }
-        public static function getPluralModelLabel(): string
+
+    public static function getPluralModelLabel(): string
     {
         return __('Members');
     }
@@ -40,16 +44,32 @@ class MemberResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('member_ID')->label(__('Member ID'))->searchable(),
-                Tables\Columns\TextColumn::make('first_name')->label(__('First Name'))->searchable(),
+                Tables\Columns\TextColumn::make('first_name')->label(__('Name'))->searchable(),
                 Tables\Columns\TextColumn::make('last_name')->label(__('Last Name'))->searchable(),
                 Tables\Columns\TextColumn::make('company.company_name')->label(__('Company')),
                 Tables\Columns\TextColumn::make('national_ID')->label(__('National ID')),
-                Tables\Columns\IconColumn::make('reference_to_pdf')
-                    ->label(__('Document'))
-                    ->icon('heroicon-o-document-text')
-                    ->url(fn ($record) => $record->reference_to_pdf ? asset('storage/' . $record->reference_to_pdf) : null, true),
+                
+                // Interactive Checkbox for is_locked status
+                Tables\Columns\CheckboxColumn::make('is_locked')
+                    ->label(__('Is Locked'))
+                    ->afterStateUpdated(function ($record, $state) {
+                        $record->update(['is_locked' => $state]);
+                    }),
+
+            ])->actions([
+            Action::make('view_document')
+                ->label(__('Document'))
+                ->icon('heroicon-o-document-text')
+                ->color('info')
+                ->visible(fn ($record) => !empty($record->reference_to_pdf))
+                ->url(fn ($record) => route('members.document.view', [
+                    'member' => $record,
+                    'v' => $record->updated_at?->timestamp ?? time(),
+                ]))
+                ->openUrlInNewTab()
             ]);
     }
+
     public static function getRelations(): array
     {
         return [

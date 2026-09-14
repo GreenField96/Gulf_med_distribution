@@ -4,7 +4,7 @@
     "Company Name": "اسم الشركة",
     "Members": "الأعضاء",
     "Member": "العضو",
-    "First Name": "الاسم الأول",
+    "Name": "الاسم",
     "Last Name": "اسم العائلة",
     "Member ID": "رقم العضوية",
     "National ID": "الرقم الوطني",
@@ -26,5 +26,12 @@
     "User" : "مستخدم",
     "Monthly Tracking" : "تتبع الأستلام شهريا",
     "Monthly Trackings" : "استلام شهريا",
-    "Medication And Dosages" : "الأدوية والجرعات"
+    "Medication And Dosages" : "الأدوية والجرعات",
+    "Medication And Dosage" : "الأدوية والجرعات",
+    "Please adjust Member medications" : "يرجي تعديل ادوية المستخدم",
+    "Is Locked" : "إيقاف الاستلام مؤقتاً",
+    "Note" : "ملاحظة",
+    "Confirmed By" : "تم التأكيد بواسطة",
+    "Medical Taken" : "تم تسليم ادوية",
+    "Created at" : "انشأ بتاريخ"
 }
