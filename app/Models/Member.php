@@ -41,6 +41,21 @@ class Member extends Model
             }
         });
     }
+    
+    // public function medications()
+    // {
+    //     // Adjust foreign key if it's not member_id
+    //     return $this->hasMany(MedicationAndDosage::class, 'member_id'); 
+    // }
+    public function medications()
+{
+    return $this->belongsToMany(
+        Medication::class,
+        'medications_and_dosages', // Pivot table name
+        'member_id',               // Foreign key on pivot table referencing Member
+        'medication_id'            // Foreign key on pivot table referencing Medication
+    )->withPivot('amount');        // Includes the 'amount' column in the output
+}
 
     public function company(): BelongsTo
     {
@@ -52,10 +67,10 @@ class Member extends Model
         return $this->hasMany(MedicalDocument::class);
     }
 
-    public function medicationDosages(): HasMany
-    {
-        return $this->belongsTo(MedicationAndDosage::class, 'member_id');
-    }
+    // public function medicationDosages(): HasMany
+    // {
+    //     return $this->belongsTo(MedicationAndDosage::class, 'member_id');
+    // }
     public function medicationAndDosages(): HasMany
     {
         return $this->hasMany(MedicationAndDosage::class, 'member_id');

@@ -17,6 +17,12 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
+use Filament\Actions\Action;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use setasign\Fpdi\Tcpdf\Fpdi;
+use Mpdf\Mpdf;
+
 class MonthlyTrackingResource extends Resource
 {
     protected static ?string $model = DateWhenMemberTakeHisMedical::class;
@@ -173,7 +179,112 @@ public static function table(Table $table): Table
                         return $query->whereDate('date_month_year', $selectedMonth);
                     }),
             ])
-            ->actions([]);
+            ->actions([
+                Action::make('generateMergedPdf')
+    ->label(__('Print PDF'))
+    ->icon('heroicon-o-document-arrow-down')
+    ->color('success')
+    ->visible(fn ($record) => (bool) $record->is_taken)
+    ->action(function ($record) {
+        $member = $record->member;
+
+        if (!$member) {
+            return;
+        }
+
+        $medications = $member->medications ?? collect();
+        // $totalPrice = $medications->sum('price') ?? 0;
+        $totalPrice = $medications->sum(function ($med) {
+            $amount = $med->pivot->amount ?? 1;
+            return $med->price * $amount;
+        });
+
+        // 1. Render Blade HTML View
+        $html = view('pdf.invoice', [
+            'member' => $member,
+            'invoice_no' => 'INV-' . $record->id,
+            'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
+            'medications' => $medications,
+            'total_price' => $totalPrice,
+        ])->render();
+
+// dd($member->medications);
+
+        // 2. Initialize mPDF with Arabic RTL Support
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'autoScriptToLang' => true,  // Automatically detects Arabic scripts
+            'autoLangToFont'   => true,  // Automatically applies Arabic-compatible fonts
+        ]);
+
+        // Force Right-To-Left direction for the entire document
+        $mpdf->SetDirectionality('rtl');
+
+        // Write HTML and output temp file
+        $mpdf->WriteHTML($html);
+        $invoicePath = storage_path("app/temp_invoice_{$record->id}.pdf");
+        $mpdf->Output($invoicePath, \Mpdf\Output\Destination::FILE);
+
+        // 3. Locate existing Member PDF
+        $memberPdfRelativePath = $member->pdf_file_path;
+        $memberPdfFullPath = $memberPdfRelativePath ? Storage::disk('public')->path($memberPdfRelativePath) : null;
+
+        // 4. Merge PDFs using FPDI
+        $fpdi = new Fpdi();
+        $fpdi->setPrintHeader(false);
+        $fpdi->setPrintFooter(false);
+
+        // Import Generated Invoice Pages
+        if (file_exists($invoicePath)) {
+            $pageCount = $fpdi->setSourceFile($invoicePath);
+            for ($i = 1; $i <= $pageCount; $i++) {
+                $template = $fpdi->importPage($i);
+                $size = $fpdi->getTemplateSize($template);
+                $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $fpdi->useTemplate($template);
+            }
+        }
+
+        // Import Member Attachment Pages (if exists)
+        if ($memberPdfFullPath && file_exists($memberPdfFullPath)) {
+            $memberPageCount = $fpdi->setSourceFile($memberPdfFullPath);
+            for ($i = 1; $i <= $memberPageCount; $i++) {
+                $template = $fpdi->importPage($i);
+                $size = $fpdi->getTemplateSize($template);
+                $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $fpdi->useTemplate($template);
+            }
+        }
+
+        // Output merged content string
+        $mergedPdfContent = $fpdi->Output('', 'S');
+
+        // Clean up temporary invoice file
+        if (file_exists($invoicePath)) {
+            unlink($invoicePath);
+        }
+
+        // 5. Trigger stream download in browser
+        $filename = "{$member->member_ID} {$totalPrice}.pdf";
+
+        return response()->streamDownload(
+            fn () => print($mergedPdfContent),
+            $filename,
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]
+        );
+    })   
+
+
+        ]);
+            
     }
 
     /**
