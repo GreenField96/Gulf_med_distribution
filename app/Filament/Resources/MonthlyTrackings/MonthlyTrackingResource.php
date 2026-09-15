@@ -23,6 +23,12 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use setasign\Fpdi\Tcpdf\Fpdi;
 use Mpdf\Mpdf;
 
+use Filament\Actions\BulkAction;
+use Illuminate\Database\Eloquent\Collection;
+use ZipArchive;
+
+use App\Models\MonthlyTracking;
+
 class MonthlyTrackingResource extends Resource
 {
     protected static ?string $model = DateWhenMemberTakeHisMedical::class;
@@ -155,6 +161,7 @@ public static function table(Table $table): Table
                     ->label(__('Confirmed By'))
                     ->default('-'),
             ])
+            
             ->filters([
                 Tables\Filters\SelectFilter::make('date_month_year')
                     ->label(__('Select Month'))
@@ -179,13 +186,14 @@ public static function table(Table $table): Table
                         return $query->whereDate('date_month_year', $selectedMonth);
                     }),
             ])
+            
             ->actions([
                 Action::make('generateMergedPdf')
-    ->label(__('Print PDF'))
-    ->icon('heroicon-o-document-arrow-down')
-    ->color('success')
-    ->visible(fn ($record) => (bool) $record->is_taken)
-    ->action(function ($record) {
+            ->label(__('Print PDF'))
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('success')
+            ->visible(fn ($record) => (bool) $record->is_taken)
+            ->action(function ($record) {
         $member = $record->member;
 
         if (!$member) {
@@ -280,10 +288,110 @@ public static function table(Table $table): Table
                 'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             ]
         );
-    })   
+    })
+    
+    
+        ])->headerActions([
+            Action::make('downloadAllTakenInvoices')
+                ->label('تحميل كافة الفواتير المستلمة (ZIP)')
+                ->icon('heroicon-o-document-duplicate')
+                ->color('success')
+                ->action(function () {
+                    $takenRecords = MonthlyTracking::with(['member.medications'])
+                        ->where('is_taken', true)
+                        ->get();
 
+                    if ($takenRecords->isEmpty()) {
+                        return;
+                    }
 
+                    $zip = new ZipArchive();
+                    $zipFileName = 'invoices_' . now()->format('Y-m-d_H-i-s') . '.zip';
+                    $zipPath = storage_path("app/public/{$zipFileName}");
+
+                    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                        return;
+                    }
+
+                    // 2. Process each taken record
+                    foreach ($takenRecords as $record) {
+                        $member = $record->member;
+                        if (!$member) {
+                            continue;
+                        }
+
+                        $medications = $member->medications;
+
+                        // Calculate total price: unit price * pivot amount
+                        $totalPrice = $medications->sum(function ($med) {
+                            $amount = $med->pivot->amount ?? 1;
+                            return $med->price * $amount;
+                        });
+
+                        // Render invoice HTML template
+                        $html = view('pdf.invoice', [
+                            'member' => $member,
+                            'invoice_no' => 'INV-' . $record->id,
+                            'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
+                            'medications' => $medications,
+                            'total_price' => $totalPrice,
+                        ])->render();
+
+                        // Initialize mPDF for Arabic RTL support
+                        $mpdf = new Mpdf([
+                            'mode' => 'utf-8',
+                            'format' => 'A4',
+                            'margin_left' => 10,
+                            'margin_right' => 10,
+                            'margin_top' => 10,
+                            'margin_bottom' => 10,
+                            'autoScriptToLang' => true,
+                            'autoLangToFont'   => true,
+                        ]);
+                        $mpdf->SetDirectionality('rtl');
+                        $mpdf->WriteHTML($html);
+
+                        // 3. Resolve path to member's document in storage/app/private/medical_pdfs
+                        $memberPdfPath = null;
+                        $pdfFile = $member->reference_to_pdf;
+
+                        if (!empty($pdfFile)) {
+                            if (Storage::disk('local')->exists($pdfFile)) {
+                                $memberPdfPath = Storage::disk('local')->path($pdfFile);
+                            } elseif (file_exists(storage_path('app/private/' . $pdfFile))) {
+                                $memberPdfPath = storage_path('app/private/' . $pdfFile);
+                            } elseif (file_exists(storage_path('app/private/medical_pdfs/' . basename($pdfFile)))) {
+                                $memberPdfPath = storage_path('app/private/medical_pdfs/' . basename($pdfFile));
+                            }
+                        }
+
+                        // 4. Import & append member's existing PDF pages directly into mPDF
+                        if ($memberPdfPath && file_exists($memberPdfPath)) {
+                            try {
+                                $pageCount = $mpdf->setSourceFile($memberPdfPath);
+                                for ($i = 1; $i <= $pageCount; $i++) {
+                                    $mpdf->AddPage();
+                                    $templateId = $mpdf->importPage($i);
+                                    $mpdf->useTemplate($templateId);
+                                }
+                            } catch (\Exception $e) {
+                                \Illuminate\Support\Facades\Log::error("Failed to append member PDF (Member ID {$member->id}): " . $e->getMessage());
+                            }
+                        }
+
+                        // 5. Save merged single PDF document into the ZIP file
+                        $mergedContent = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
+                        $filenameInZip = "{$member->member_ID} {$totalPrice}.pdf";
+
+                        $zip->addFromString($filenameInZip, $mergedContent);
+                    }
+
+                    $zip->close();
+
+                    return response()->download($zipPath)->deleteFileAfterSend(true);
+                }),
         ]);
+
             
     }
 
