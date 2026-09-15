@@ -29,6 +29,8 @@ use ZipArchive;
 
 use App\Models\MonthlyTracking;
 
+use Illuminate\Support\Facades\Auth;
+
 class MonthlyTrackingResource extends Resource
 {
     protected static ?string $model = DateWhenMemberTakeHisMedical::class;
@@ -186,209 +188,122 @@ public static function table(Table $table): Table
                         return $query->whereDate('date_month_year', $selectedMonth);
                     }),
             ])
-            
-            ->actions([
-                Action::make('generateMergedPdf')
-            ->label(__('Print PDF'))
-            ->icon('heroicon-o-document-arrow-down')
-            ->color('success')
-            ->visible(fn ($record) => (bool) $record->is_taken)
-            ->action(function ($record) {
-        $member = $record->member;
-
-        if (!$member) {
-            return;
-        }
-
-        $medications = $member->medications ?? collect();
-        // $totalPrice = $medications->sum('price') ?? 0;
-        $totalPrice = $medications->sum(function ($med) {
-            $amount = $med->pivot->amount ?? 1;
-            return $med->price * $amount;
-        });
-
-        // 1. Render Blade HTML View
-        $html = view('pdf.invoice', [
-            'member' => $member,
-            'invoice_no' => 'INV-' . $record->id,
-            'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
-            'medications' => $medications,
-            'total_price' => $totalPrice,
-        ])->render();
-
-// dd($member->medications);
-
-        // 2. Initialize mPDF with Arabic RTL Support
-        $mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'margin_left' => 10,
-            'margin_right' => 10,
-            'margin_top' => 10,
-            'margin_bottom' => 10,
-            'autoScriptToLang' => true,  // Automatically detects Arabic scripts
-            'autoLangToFont'   => true,  // Automatically applies Arabic-compatible fonts
-        ]);
-
-        // Force Right-To-Left direction for the entire document
-        $mpdf->SetDirectionality('rtl');
-
-        // Write HTML and output temp file
-        $mpdf->WriteHTML($html);
-        $invoicePath = storage_path("app/temp_invoice_{$record->id}.pdf");
-        $mpdf->Output($invoicePath, \Mpdf\Output\Destination::FILE);
-
-        // 3. Locate existing Member PDF
-        $memberPdfRelativePath = $member->pdf_file_path;
-        $memberPdfFullPath = $memberPdfRelativePath ? Storage::disk('public')->path($memberPdfRelativePath) : null;
-
-        // 4. Merge PDFs using FPDI
-        $fpdi = new Fpdi();
-        $fpdi->setPrintHeader(false);
-        $fpdi->setPrintFooter(false);
-
-        // Import Generated Invoice Pages
-        if (file_exists($invoicePath)) {
-            $pageCount = $fpdi->setSourceFile($invoicePath);
-            for ($i = 1; $i <= $pageCount; $i++) {
-                $template = $fpdi->importPage($i);
-                $size = $fpdi->getTemplateSize($template);
-                $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                $fpdi->useTemplate($template);
-            }
-        }
-
-        // Import Member Attachment Pages (if exists)
-        if ($memberPdfFullPath && file_exists($memberPdfFullPath)) {
-            $memberPageCount = $fpdi->setSourceFile($memberPdfFullPath);
-            for ($i = 1; $i <= $memberPageCount; $i++) {
-                $template = $fpdi->importPage($i);
-                $size = $fpdi->getTemplateSize($template);
-                $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                $fpdi->useTemplate($template);
-            }
-        }
-
-        // Output merged content string
-        $mergedPdfContent = $fpdi->Output('', 'S');
-
-        // Clean up temporary invoice file
-        if (file_exists($invoicePath)) {
-            unlink($invoicePath);
-        }
-
-        // 5. Trigger stream download in browser
-        $filename = "{$member->member_ID} {$totalPrice}.pdf";
-
-        return response()->streamDownload(
-            fn () => print($mergedPdfContent),
-            $filename,
-            [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            ]
-        );
-    })
     
     
-        ])->headerActions([
+        ->headerActions([
             Action::make('downloadAllTakenInvoices')
                 ->label('تحميل كافة الفواتير المستلمة (ZIP)')
                 ->icon('heroicon-o-document-duplicate')
                 ->color('success')
+                ->visible(function () {
+                    $user = Auth::user();
+                    if (!$user) {
+                        return false;
+                    }
+
+                    // Option B: If you have a 'role' column on your users table
+                    return in_array($user->role, ['admin_user', 'medical_distro_operator_user']);
+                })
                 ->action(function () {
-                    $takenRecords = MonthlyTracking::with(['member.medications'])
-                        ->where('is_taken', true)
-                        ->get();
+                  $takenRecords = MonthlyTracking::with(['member.medications'])
+                ->where('is_taken', true)
+                ->get();
 
-                    if ($takenRecords->isEmpty()) {
-                        return;
+            if ($takenRecords->isEmpty()) {
+                return;
+            }
+
+            $zip = new ZipArchive();
+            $zipFileName = 'invoices_' . now()->format('Y-m-d_H-i-s') . '.zip';
+            $zipPath = storage_path("app/public/{$zipFileName}");
+
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                return;
+            }
+
+            foreach ($takenRecords as $record) {
+                $member = $record->member;
+                if (!$member) {
+                    continue;
+                }
+
+                $medications = $member->medications;
+
+                // 1. Calculate Total Price
+                $totalPrice = $medications->sum(function ($med) {
+                    $amount = $med->pivot->amount ?? 1;
+                    return $med->price * $amount;
+                });
+
+                // 2. Render Blade HTML View
+                $html = view('pdf.invoice', [
+                    'member' => $member,
+                    'invoice_no' => 'INV-' . $record->id,
+                    'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
+                    'medications' => $medications,
+                    'total_price' => $totalPrice,
+                ])->render();
+
+                // 3. Initialize mPDF
+                $mpdf = new Mpdf([
+                    'mode' => 'utf-8',
+                    'format' => 'A4',
+                    'margin_left' => 10,
+                    'margin_right' => 10,
+                    'margin_top' => 10,
+                    'margin_bottom' => 10,
+                    'autoScriptToLang' => true,
+                    'autoLangToFont'   => true,
+                ]);
+                $mpdf->SetDirectionality('rtl');
+                $mpdf->WriteHTML($html);
+
+                // 4. Resolve Private Member Document Path
+                $memberPdfPath = null;
+                $pdfFile = $member->reference_to_pdf;
+
+                if (!empty($pdfFile)) {
+                    if (Storage::disk('local')->exists($pdfFile)) {
+                        $memberPdfPath = Storage::disk('local')->path($pdfFile);
+                    } elseif (file_exists(storage_path('app/private/' . $pdfFile))) {
+                        $memberPdfPath = storage_path('app/private/' . $pdfFile);
+                    } elseif (file_exists(storage_path('app/private/medical_pdfs/' . basename($pdfFile)))) {
+                        $memberPdfPath = storage_path('app/private/medical_pdfs/' . basename($pdfFile));
                     }
+                }
 
-                    $zip = new ZipArchive();
-                    $zipFileName = 'invoices_' . now()->format('Y-m-d_H-i-s') . '.zip';
-                    $zipPath = storage_path("app/public/{$zipFileName}");
-
-                    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-                        return;
+                // 5. Append Member Attachment Pages to mPDF Invoice
+                if ($memberPdfPath && file_exists($memberPdfPath)) {
+                    try {
+                        $pageCount = $mpdf->setSourceFile($memberPdfPath);
+                        for ($i = 1; $i <= $pageCount; $i++) {
+                            $mpdf->AddPage();
+                            $templateId = $mpdf->importPage($i);
+                            $mpdf->useTemplate($templateId);
+                        }
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to append member PDF (ID {$member->id}): " . $e->getMessage());
                     }
+                }
 
-                    // 2. Process each taken record
-                    foreach ($takenRecords as $record) {
-                        $member = $record->member;
-                        if (!$member) {
-                            continue;
-                        }
+                // 6. Generate Binary Content
+                $mergedContent = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
+                $filename = "{$member->member_ID} {$totalPrice}.pdf";
 
-                        $medications = $member->medications;
+                // 7. Store Copy in Public Folder under Year-Month Directory (e.g. storage/app/public/2026-09/invoice 123 50.pdf)
+                $monthFolder = Carbon::parse($record->date_month_year)->format('Y-m');
+                $publicStoragePath = "{$monthFolder}/{$filename}";
+                
+                Storage::disk('public')->put($publicStoragePath, $mergedContent);
 
-                        // Calculate total price: unit price * pivot amount
-                        $totalPrice = $medications->sum(function ($med) {
-                            $amount = $med->pivot->amount ?? 1;
-                            return $med->price * $amount;
-                        });
+                // 8. Add File to Downloadable ZIP Archive
+                $zip->addFromString($filename, $mergedContent);
+            }
 
-                        // Render invoice HTML template
-                        $html = view('pdf.invoice', [
-                            'member' => $member,
-                            'invoice_no' => 'INV-' . $record->id,
-                            'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
-                            'medications' => $medications,
-                            'total_price' => $totalPrice,
-                        ])->render();
+            $zip->close();
 
-                        // Initialize mPDF for Arabic RTL support
-                        $mpdf = new Mpdf([
-                            'mode' => 'utf-8',
-                            'format' => 'A4',
-                            'margin_left' => 10,
-                            'margin_right' => 10,
-                            'margin_top' => 10,
-                            'margin_bottom' => 10,
-                            'autoScriptToLang' => true,
-                            'autoLangToFont'   => true,
-                        ]);
-                        $mpdf->SetDirectionality('rtl');
-                        $mpdf->WriteHTML($html);
-
-                        // 3. Resolve path to member's document in storage/app/private/medical_pdfs
-                        $memberPdfPath = null;
-                        $pdfFile = $member->reference_to_pdf;
-
-                        if (!empty($pdfFile)) {
-                            if (Storage::disk('local')->exists($pdfFile)) {
-                                $memberPdfPath = Storage::disk('local')->path($pdfFile);
-                            } elseif (file_exists(storage_path('app/private/' . $pdfFile))) {
-                                $memberPdfPath = storage_path('app/private/' . $pdfFile);
-                            } elseif (file_exists(storage_path('app/private/medical_pdfs/' . basename($pdfFile)))) {
-                                $memberPdfPath = storage_path('app/private/medical_pdfs/' . basename($pdfFile));
-                            }
-                        }
-
-                        // 4. Import & append member's existing PDF pages directly into mPDF
-                        if ($memberPdfPath && file_exists($memberPdfPath)) {
-                            try {
-                                $pageCount = $mpdf->setSourceFile($memberPdfPath);
-                                for ($i = 1; $i <= $pageCount; $i++) {
-                                    $mpdf->AddPage();
-                                    $templateId = $mpdf->importPage($i);
-                                    $mpdf->useTemplate($templateId);
-                                }
-                            } catch (\Exception $e) {
-                                \Illuminate\Support\Facades\Log::error("Failed to append member PDF (Member ID {$member->id}): " . $e->getMessage());
-                            }
-                        }
-
-                        // 5. Save merged single PDF document into the ZIP file
-                        $mergedContent = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
-                        $filenameInZip = "{$member->member_ID} {$totalPrice}.pdf";
-
-                        $zip->addFromString($filenameInZip, $mergedContent);
-                    }
-
-                    $zip->close();
-
-                    return response()->download($zipPath)->deleteFileAfterSend(true);
+            return response()->download($zipPath)->deleteFileAfterSend(true);
+        
                 }),
         ]);
 
