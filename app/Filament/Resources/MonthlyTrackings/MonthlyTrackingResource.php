@@ -31,6 +31,7 @@ use App\Models\MonthlyTracking;
 
 use Illuminate\Support\Facades\Auth;
 
+
 class MonthlyTrackingResource extends Resource
 {
     protected static ?string $model = DateWhenMemberTakeHisMedical::class;
@@ -80,8 +81,8 @@ class MonthlyTrackingResource extends Resource
                 Toggle::make('is_taken')
                     ->label(__('Is Taken'))
                     ->default(false)
-                    ->disabled(fn ($record) => $record?->member?->is_locked ?? false),
-
+                    // ->disabled(fn ($record) => $record?->member?->is_locked ?? false),
+                ,
                 Select::make('confirmed_by_user_id')
                     ->label(__('Confirmed By'))
                     ->relationship('confirmedBy', 'name')
@@ -117,7 +118,6 @@ public static function table(Table $table): Table
                 Tables\Columns\CheckboxColumn::make('is_taken')
                     ->label(__('Medical Taken'))
                     ->disabled(function ($record) {
-                        /** @var \App\Models\User $user */
                         $user = auth()->user();
 
                         // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
@@ -125,7 +125,7 @@ public static function table(Table $table): Table
                             return true;
                         }
 
-                        if (!$record || !$record->date_month_year) {
+                        if (!$record || !$record->date_month_year || $record->is_taken) {
                             return true;
                         }
 

@@ -6,22 +6,27 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Grid;
 
 class MemberForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->components([
+        ->components([
+            Section::make([
                 Select::make('company_id')
-    ->label(__('Company'))
-    ->relationship('company', 'company_name')
-    ->required()
-    ->default(fn () => auth()->user()?->company_id)
-    ->disabled(fn () => auth()->user()?->isCompanyMember())
-    ->dehydrated(), // Ensures the value is still submitted to the database when disabled
+                    ->label(__('Company'))
+                    ->relationship('company', 'company_name')
+                    ->required()
+                    ->default(fn () => auth()->user()?->company_id)
+                    ->disabled(fn () => auth()->user()?->isCompanyMember())
+                    ->dehydrated(), 
+
                 TextInput::make('first_name')
-                    ->label(__('First Name'))
+                    ->label(__('Name'))
                     ->required(),
 
                 TextInput::make('last_name')
@@ -33,6 +38,9 @@ class MemberForm
                     ->required()
                     ->unique(ignoreRecord: true),
 
+            ])->disabled(fn () => ! in_array(auth()->user()?->role, ['admin_user', 'companies_members'])), // <-- Chained to Group::make()
+                
+            Section::make([
                 TextInput::make('national_ID')
                     ->label(__('National ID'))
                     ->required(),
@@ -50,6 +58,8 @@ class MemberForm
                     ->acceptedFileTypes(['application/pdf'])
                     ->maxSize(10240)
                     ->required(fn ($livewire) => $livewire instanceof CreateMember),
-            ]);
+            ])->disabled(fn () => ! in_array(auth()->user()?->role, ['admin_user', 'companies_members'])), // <-- Chained to Group::make()
+        
+        ]);
     }
 }
