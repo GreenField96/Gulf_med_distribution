@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\MonthlyTrackings\MonthlyTrackings\Schemas;
+namespace App\Filament\Resources\MonthlyTrackings\Schemas;
 
 use Filament\Schemas\Schema;
 
