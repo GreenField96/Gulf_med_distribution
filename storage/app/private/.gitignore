@@ -1,2 +1,4 @@
 *
 !.gitignore
+!medical_pdfs/
+!medical_pdfs/**
