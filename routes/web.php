@@ -4,10 +4,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Member;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// Route::get('/', function () {
+//     return view('welcome');
+// });
 
+Route::redirect('/', '/admin');
 
 Route::get('/members/{member}/document', function (Member $member) {
     if (!auth()->check()) {
