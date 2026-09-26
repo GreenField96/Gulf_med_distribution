@@ -115,36 +115,141 @@ public static function table(Table $table): Table
                     ->default('-'),
 
                 // Interactive Checkbox Column
+                // Tables\Columns\CheckboxColumn::make('is_taken')
+                //     ->label(__('Medical Taken'))
+                //     ->disabled(function ($record) {
+                //         $user = auth()->user();
+
+                //         // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
+                //         if (!$user || !($user->isAdmin() || $user->isMedicalOperator())) {
+                //             return true;
+                //         }
+
+                //         if (!$record || !$record->date_month_year || $record->is_taken) {
+                //             return true;
+                //         }
+
+                //         // 2. Disable if member is locked due to PDF/document change
+                //         if ($record->member && $record->member->is_locked) {
+                //             return true;
+                //         }
+
+                //         $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
+                //         $currentMonth = Carbon::now()->startOfMonth();
+
+                //         // 3. Lock modifications if the record belongs to a past month
+                //         return $selectedMonth->lt($currentMonth);
+                //     })
+                //     ->beforeStateUpdated(function ($record, $state) {
+                //         $record->update([
+                //             'confirmed_by_user_id' => $state ? auth()->id() : null,
+                //         ]);
+                //     }),
                 Tables\Columns\CheckboxColumn::make('is_taken')
-                    ->label(__('Medical Taken'))
-                    ->disabled(function ($record) {
-                        $user = auth()->user();
+    ->label(__('Medical Taken'))
+    ->disabled(function ($record) {
+        $user = auth()->user();
 
-                        // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
-                        if (!$user || !($user->isAdmin() || $user->isMedicalOperator())) {
-                            return true;
-                        }
+        // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
+        if (!$user || !($user->isAdmin() || $user->isMedicalOperator())) {
+            return true;
+        }
 
-                        if (!$record || !$record->date_month_year || $record->is_taken) {
-                            return true;
-                        }
+        if (!$record || !$record->date_month_year || $record->is_taken) {
+            return true;
+        }
 
-                        // 2. Disable if member is locked due to PDF/document change
-                        if ($record->member && $record->member->is_locked) {
-                            return true;
-                        }
+        // 2. Disable if member is locked due to PDF/document change
+        if ($record->member && $record->member->is_locked) {
+            return true;
+        }
 
-                        $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
-                        $currentMonth = Carbon::now()->startOfMonth();
+        $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
+        $currentMonth = Carbon::now()->startOfMonth();
 
-                        // 3. Lock modifications if the record belongs to a past month
-                        return $selectedMonth->lt($currentMonth);
-                    })
-                    ->beforeStateUpdated(function ($record, $state) {
-                        $record->update([
-                            'confirmed_by_user_id' => $state ? auth()->id() : null,
-                        ]);
-                    }),
+        // 3. Lock modifications if the record belongs to a past month
+        return $selectedMonth->lt($currentMonth);
+    })
+    ->afterStateUpdated(function ($record, $state) {
+        // Record user who confirmed the status
+        $record->update([
+            'confirmed_by_user_id' => $state ? auth()->id() : null,
+        ]);
+
+        // Only generate claim PDF when checked (state = true)
+        if (!$state) {
+            return;
+        }
+
+        $member = $record->member;
+        if (!$member) {
+            return;
+        }
+
+        // 1. Calculate Total Price from Member Medications
+        $medications = $member->medications;
+        $totalPrice = $medications->sum(function ($med) {
+            $amount = $med->pivot->amount ?? 1;
+            return $med->price * $amount;
+        });
+
+        // 2. Render Blade View
+        $html = view('pdf.invoice', [
+            'member' => $member,
+            'invoice_no' => 'INV-' . $record->id,
+            'date' => Carbon::parse($record->date_month_year)->format('Y/m'),
+            'medications' => $medications,
+            'total_price' => $totalPrice,
+        ])->render();
+
+        // 3. Initialize mPDF Engine
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => 10,
+            'margin_bottom' => 10,
+            'autoScriptToLang' => true,
+            'autoLangToFont' => true,
+        ]);
+        $mpdf->SetDirectionality('rtl');
+        $mpdf->WriteHTML($html);
+
+        // 4. Resolve Private Member Reference Document
+        $memberPdfPath = null;
+        $pdfFile = $member->reference_to_pdf;
+
+        if (!empty($pdfFile)) {
+            if (Storage::disk('local')->exists($pdfFile)) {
+                $memberPdfPath = Storage::disk('local')->path($pdfFile);
+            } elseif (file_exists(storage_path('app/private/' . $pdfFile))) {
+                $memberPdfPath = storage_path('app/private/' . $pdfFile);
+            } elseif (file_exists(storage_path('app/private/medical_pdfs/' . basename($pdfFile)))) {
+                $memberPdfPath = storage_path('app/private/medical_pdfs/' . basename($pdfFile));
+            }
+        }
+
+        // 5. Append Member Attachment Pages to Invoice
+        if ($memberPdfPath && file_exists($memberPdfPath)) {
+            try {
+                $pageCount = $mpdf->setSourceFile($memberPdfPath);
+                for ($i = 1; $i <= $pageCount; $i++) {
+                    $mpdf->AddPage();
+                    $templateId = $mpdf->importPage($i);
+                    $mpdf->useTemplate($templateId);
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to append member PDF (ID {$member->id}): " . $e->getMessage());
+            }
+        }
+
+        // 6. Save Single Merged PDF to public/claims/
+        $mergedContent = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
+        $filename = "{$member->member_ID} {$totalPrice}.pdf";
+
+        Storage::disk('public')->put("claims/{$filename}", $mergedContent);
+    }),
 
                 // Lock Warning Note Column
                 Tables\Columns\TextColumn::make('lock_status')
@@ -202,7 +307,7 @@ public static function table(Table $table): Table
                     }
 
                     // Option B: If you have a 'role' column on your users table
-                    return in_array($user->role, ['admin_user', 'medical_distro_operator_user']);
+                    return in_array($user->role, ['admin_user']);
                 })
                 ->action(function () {
                   $takenRecords = MonthlyTracking::with(['member.medications'])
