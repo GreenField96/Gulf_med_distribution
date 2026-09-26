@@ -10,8 +10,8 @@ class Member extends Model
 {
     protected $fillable = [
         'company_id',
-        'first_name',
-        'last_name',
+        'full_name',
+        // 'last_name',
         'member_ID',
         'national_ID',
         'family_ID',

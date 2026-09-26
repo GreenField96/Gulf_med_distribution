@@ -25,13 +25,13 @@ class MemberForm
                     ->disabled(fn () => auth()->user()?->isCompanyMember())
                     ->dehydrated(), 
 
-                TextInput::make('first_name')
-                    ->label(__('Name'))
+                TextInput::make('full_name')
+                    ->label(__('Full Name'))
                     ->required(),
 
-                TextInput::make('last_name')
-                    ->label(__('Last Name'))
-                    ->required(),
+                // TextInput::make('last_name')
+                //     ->label(__('Last Name'))
+                //     ->required(),
 
                 TextInput::make('member_ID')
                     ->label(__('Member ID'))

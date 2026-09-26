@@ -46,7 +46,7 @@
         </thead>
         <tbody>
             <tr>
-                <td><div>اسم المريض: {{ $member->first_name }} {{ $member->last_name }}</div></td>
+                <td><div>اسم المريض: {{ $member->full_name }}</div></td>
                 <td><div>رقم الفاتورة: {{ $invoice_no }}</div></td>
             </tr>
             <tr>

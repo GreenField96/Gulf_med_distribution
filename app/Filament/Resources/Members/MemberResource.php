@@ -44,8 +44,8 @@ class MemberResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('member_ID')->label(__('Member ID'))->searchable(),
-                Tables\Columns\TextColumn::make('first_name')->label(__('Name'))->searchable(),
-                Tables\Columns\TextColumn::make('last_name')->label(__('Last Name'))->searchable(),
+                Tables\Columns\TextColumn::make('full_name')->label(__('Full Name'))->searchable(),
+                // Tables\Columns\TextColumn::make('last_name')->label(__('Last Name'))->searchable(),
                 Tables\Columns\TextColumn::make('company.company_name')->label(__('Company')),
                 Tables\Columns\TextColumn::make('national_ID')->label(__('National ID')),
                 

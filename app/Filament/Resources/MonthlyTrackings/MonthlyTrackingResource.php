@@ -96,13 +96,13 @@ public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('member.first_name')
-                    ->label(__('First Name'))
+                Tables\Columns\TextColumn::make('member.full_name')
+                    ->label(__('Full Name'))
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('member.last_name')
-                    ->label(__('Last Name'))
-                    ->searchable(),
+                // Tables\Columns\TextColumn::make('member.last_name')
+                //     ->label(__('Last Name'))
+                //     ->searchable(),
 
                 Tables\Columns\TextColumn::make('member.member_ID')
                     ->label(__('Member ID'))
@@ -114,37 +114,11 @@ public static function table(Table $table): Table
                     ->searchable()
                     ->default('-'),
 
-                // Interactive Checkbox Column
-                // Tables\Columns\CheckboxColumn::make('is_taken')
-                //     ->label(__('Medical Taken'))
-                //     ->disabled(function ($record) {
-                //         $user = auth()->user();
+                Tables\Columns\TextColumn::make('member.company.company_name')
+                    ->label(__('Company Name'))
+                    ->searchable()
+                    ->sortable(),
 
-                //         // 1. Disable if current user is not authorized (Must be Admin or Medical Operator)
-                //         if (!$user || !($user->isAdmin() || $user->isMedicalOperator())) {
-                //             return true;
-                //         }
-
-                //         if (!$record || !$record->date_month_year || $record->is_taken) {
-                //             return true;
-                //         }
-
-                //         // 2. Disable if member is locked due to PDF/document change
-                //         if ($record->member && $record->member->is_locked) {
-                //             return true;
-                //         }
-
-                //         $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
-                //         $currentMonth = Carbon::now()->startOfMonth();
-
-                //         // 3. Lock modifications if the record belongs to a past month
-                //         return $selectedMonth->lt($currentMonth);
-                //     })
-                //     ->beforeStateUpdated(function ($record, $state) {
-                //         $record->update([
-                //             'confirmed_by_user_id' => $state ? auth()->id() : null,
-                //         ]);
-                //     }),
                 Tables\Columns\CheckboxColumn::make('is_taken')
     ->label(__('Medical Taken'))
     ->disabled(function ($record) {
