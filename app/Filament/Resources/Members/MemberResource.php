@@ -48,6 +48,7 @@ class MemberResource extends Resource
                 // Tables\Columns\TextColumn::make('last_name')->label(__('Last Name'))->searchable(),
                 Tables\Columns\TextColumn::make('company.company_name')->label(__('Company')),
                 Tables\Columns\TextColumn::make('national_ID')->label(__('National ID')),
+                Tables\Columns\TextColumn::make('city')->label(__('City'))->searchable(),
                 
                 // Interactive Checkbox for is_locked status
                 Tables\Columns\CheckboxColumn::make('is_locked')

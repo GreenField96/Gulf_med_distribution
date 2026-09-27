@@ -34,5 +34,10 @@
     "Confirmed By" : "تم التأكيد بواسطة",
     "Medical Taken" : "تم تسليم ادوية",
     "Created at" : "انشأ بتاريخ",
-    "Full Name" : "الاسم الكامل"
+    "Full Name" : "الاسم الكامل",
+    "Total Price" : "الاجمالي",
+    "Medication Name" : "اسم الدواء",
+    "City" : "المدينة",
+    "The :attribute field is required.": "حقل :attribute مطلوب."
+
 }

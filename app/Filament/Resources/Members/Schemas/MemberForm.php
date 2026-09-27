@@ -6,9 +6,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Auth;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
 
 class MemberForm
 {
@@ -29,21 +27,24 @@ class MemberForm
                     ->label(__('Full Name'))
                     ->required(),
 
-                // TextInput::make('last_name')
-                //     ->label(__('Last Name'))
-                //     ->required(),
-
                 TextInput::make('member_ID')
                     ->label(__('Member ID'))
                     ->required()
                     ->unique(ignoreRecord: true),
+                
+                Select::make('city')
+                    ->label(__('City'))
+                    ->options([
+                    'طرابلس' => 'طرابلس',
+                    'بنغازي' => 'بنغازي',
+                    ])
+                    ->native(false),
 
             ])->disabled(fn () => ! in_array(auth()->user()?->role, ['admin_user', 'companies_members'])), // <-- Chained to Group::make()
                 
             Section::make([
                 TextInput::make('national_ID')
-                    ->label(__('National ID'))
-                    ->required(),
+                    ->label(__('National ID')),
 
                 TextInput::make('family_ID')
                     ->label(__('Family ID')),

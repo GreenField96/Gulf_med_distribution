@@ -47,7 +47,7 @@ class MedicationResource extends Resource
 
                     Tables\Columns\TextColumn::make('price')
                     ->label(__('Price'))
-                    ->money('LYD')
+                    ->money(currency: 'LYD', locale: 'en')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')

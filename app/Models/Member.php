@@ -18,6 +18,7 @@ class Member extends Model
         'phone_num',
         'reference_to_pdf',
         'is_locked',
+        'city',
     ];
     protected static function booted(): void
     {

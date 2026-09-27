@@ -11,9 +11,14 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class MedicationAndDosagesRelationManager extends RelationManager
 {
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return __('Medication And Dosages');
+    }
     public static function getNavigationLabel(): string
     {
         return __('Medication And Dosages');
@@ -68,7 +73,7 @@ class MedicationAndDosagesRelationManager extends RelationManager
                         $unitPrice = $record->medication?->price ?? 0;
                         return $record->amount * $unitPrice;
                     })
-                    ->money('LYD'),
+                    ->money(currency: 'LYD', locale: 'en'),
             ])
             ->headerActions([
                 CreateAction::make(),
