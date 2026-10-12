@@ -27,7 +27,7 @@ class MemberPolicy
 
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isMedicalOperator() || $user->isCompanyMember();
+        return $user->isAdmin() || $user->isCompanyMember();
     }
 
     public function update(User $user, Member $member): bool

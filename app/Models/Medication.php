@@ -10,6 +10,7 @@ class Medication extends Model
     protected $fillable = [
         'medical_name',
         'dosages',
+        'price',
     ];
 
     public function memberDosages(): HasMany

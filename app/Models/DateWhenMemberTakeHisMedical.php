@@ -15,10 +15,14 @@ class DateWhenMemberTakeHisMedical extends Model
         'is_taken',
         'confirmed_by_user_id',
     ];
+protected $casts = [
+        'date_month_year' => 'date',
+        'is_taken' => 'boolean',
+    ];
 
     public function member(): BelongsTo
     {
-        return $this->belongsTo(Member::class);
+        return $this->belongsTo(Member::class, 'member_id');
     }
 
     public function confirmedBy(): BelongsTo

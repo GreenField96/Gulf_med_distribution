@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Member extends Model
 {
@@ -17,6 +18,20 @@ class Member extends Model
         'phone_num',
         'reference_to_pdf',
     ];
+    protected static function booted(): void
+    {
+        static::created(function ($member) {
+            $currentMonth = Carbon::now()->startOfMonth()->toDateString();
+
+            DateWhenMemberTakeHisMedical::firstOrCreate([
+                'member_id' => $member->id,
+                'date_month_year' => $currentMonth,
+            ], [
+                'is_taken' => false,
+                'confirmed_by_user_id' => null,
+            ]);
+        });
+    }
 
     public function company(): BelongsTo
     {

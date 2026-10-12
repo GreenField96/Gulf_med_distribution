@@ -27,16 +27,17 @@ class MedicationAndDosagesRelationManager extends RelationManager
                     ->preload()
                     ->required(),
 
-                TextInput::make('dosage')
-                    ->label(__('Dosage'))
-                    ->placeholder('e.g., 500mg - 2x daily')
+                TextInput::make('amount')
+                    ->label(__('Amount'))
+                    ->placeholder('e.g., 1 , 2')
+                    ->rule('gt:0')
                     ->required(),
 
-                TextInput::make('price')
-                    ->label(__('Price'))
-                    ->numeric()
-                    ->prefix('LYD')
-                    ->required(),
+                // TextInput::make('price')
+                //     ->label(__('Price'))
+                //     ->numeric()
+                //     ->prefix('LYD')
+                //     ->required(),
             ]);
     }
 
@@ -49,12 +50,16 @@ class MedicationAndDosagesRelationManager extends RelationManager
                     ->label(__('Medication Name'))
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('dosage')
-                    ->label(__('Dosage')),
-
-                Tables\Columns\TextColumn::make('price')
-                    ->label(__('Price'))
+                Tables\Columns\TextColumn::make('amount')
+                    ->label(__('Amount')),
+                    Tables\Columns\TextColumn::make('total_price')
+                    ->label(__('Total Price'))
+                    ->getStateUsing(function ($record) {
+                        $unitPrice = $record->medication?->price ?? 0;
+                        return $record->amount * $unitPrice;
+                    })
                     ->money('LYD'),
+
             ])
             ->headerActions([
                 CreateAction::make(),

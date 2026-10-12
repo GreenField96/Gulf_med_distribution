@@ -1,24 +1,25 @@
 <?php
 
-
 namespace App\Filament\Resources\MonthlyTrackings;
 
 use App\Filament\Resources\MonthlyTrackings\Pages;
-use App\Models\MonthlyTracking;
+use App\Models\DateWhenMemberTakeHisMedical;
+use App\Models\Member;
 use BackedEnum;
-use Filament\Forms\Components\DatePicker;
+use Carbon\Carbon;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
+use Illuminate\Database\Eloquent\Builder;
 
 class MonthlyTrackingResource extends Resource
 {
-    protected static ?string $model = MonthlyTracking::class;
+    protected static ?string $model = DateWhenMemberTakeHisMedical::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
 
@@ -27,35 +28,33 @@ class MonthlyTrackingResource extends Resource
         return auth()->check();
     }
 
-
-public static function getNavigationLabel(): string
+    public static function getNavigationLabel(): string
     {
-    return __('Monthly Tracking');
+        return __('Monthly Tracking');
     }
+
     public static function getModelLabel(): string
     {
-    return __('Monthly Tracking');
+        return __('Monthly Tracking');
     }
-        public static function getPluralModelLabel(): string
+
+    public static function getPluralModelLabel(): string
     {
         return __('Monthly Trackings');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $currentMonth = Carbon::now()->startOfMonth()->toDateString();
+        static::ensureMonthlyRecordsExist($currentMonth);
+
+        return parent::getEloquentQuery();
     }
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Select::make('member_id')
-                    ->label(__('Member'))
-                    ->relationship('member', 'first_name')
-                    ->searchable()
-                    ->required(),
-
-                DatePicker::make('date_month_year')
-                    ->label(__('Date'))
-                    ->default(now())
-                    ->required(),
-
                 Toggle::make('is_taken')
                     ->label(__('Is Taken'))
                     ->default(false),
@@ -73,49 +72,121 @@ public static function getNavigationLabel(): string
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('member.first_name')
-                    ->label(__('Member First Name'))
+                    ->label(__('First Name'))
                     ->searchable(),
 
                 Tables\Columns\TextColumn::make('member.last_name')
-                    ->label(__('Member Last Name'))
+                    ->label(__('Last Name'))
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('date_month_year')
-                    ->label(__('Date'))
-                    ->date()
+                Tables\Columns\TextColumn::make('member.member_ID')
+                    ->label(__('Member ID'))
+                    ->searchable()
                     ->sortable(),
 
-                Tables\Columns\IconColumn::make('is_taken')
-                    ->label(__('Taken'))
-                    ->boolean(),
+                Tables\Columns\TextColumn::make('member.national_ID')
+                    ->label(__('National ID'))
+                    ->searchable()
+                    ->default('-'),
+
+                // Interactive Checkbox Column
+                Tables\Columns\CheckboxColumn::make('is_taken')
+                    ->label(__('Medical Taken'))
+                    ->disabled(function ($record) {
+                        if (!$record || !$record->date_month_year) {
+                            return true;
+                        }
+
+                        $selectedMonth = Carbon::parse($record->date_month_year)->startOfMonth();
+                        $currentMonth = Carbon::now()->startOfMonth();
+
+                        // Lock modifications if the record belongs to a past month
+                        return $selectedMonth->lt($currentMonth);
+                    })
+                    ->beforeStateUpdated(function ($record, $state) {
+                        $record->update([
+                            'confirmed_by_user_id' => $state ? auth()->id() : null,
+                        ]);
+                    }),
 
                 Tables\Columns\TextColumn::make('confirmedBy.name')
                     ->label(__('Confirmed By'))
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label(__('Recorded At'))
-                    ->dateTime()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->default('-'),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_taken')
-                    ->label(__('Medication Status'))
-                    ->trueLabel(__('Taken'))
-                    ->falseLabel(__('Not Taken')),
+                Tables\Filters\SelectFilter::make('date_month_year')
+                    ->label(__('Select Month'))
+                    ->options(function () {
+                        return DateWhenMemberTakeHisMedical::query()
+                            ->selectRaw("DATE_FORMAT(date_month_year, '%Y-%m-01') as month_val, DATE_FORMAT(date_month_year, '%m/%Y') as month_label")
+                            ->distinct()    
+                            ->orderBy('month_val', 'desc')
+                            ->pluck('month_label', 'month_val')
+                            ->toArray();
+                    })
+                    ->default(Carbon::now()->startOfMonth()->toDateString())
+                    ->selectablePlaceholder(false)
+                    ->query(function (Builder $query, array $data) {
+                        $selectedMonth = !empty($data['value'])
+                            ? $data['value']
+                            : Carbon::now()->startOfMonth()->toDateString();
+
+                        // Seed records specifically for the filtered month
+                        static::ensureMonthlyRecordsExist($selectedMonth);
+
+                        return $query->whereDate('date_month_year', $selectedMonth);
+                    }),
             ])
             ->actions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->disabled(fn ($record) => Carbon::parse($record->date_month_year)->startOfMonth()->lt(Carbon::now()->startOfMonth())),
+                DeleteAction::make()
+                    ->disabled(fn ($record) => Carbon::parse($record->date_month_year)->startOfMonth()->lt(Carbon::now()->startOfMonth())),
             ]);
+    }
+
+    /**
+     * Bulk inserts tracking entries for all members missing a record in $monthDate.
+     */
+    public static function ensureMonthlyRecordsExist(string $monthDate): void
+    {
+        $existingMemberIds = DateWhenMemberTakeHisMedical::query()
+            ->whereDate('date_month_year', $monthDate)
+            ->pluck('member_id')
+            ->toArray();
+
+        $missingMemberIds = Member::query()
+            ->whereNotIn('id', $existingMemberIds)
+            ->pluck('id');
+
+        if ($missingMemberIds->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        $recordsToInsert = [];
+
+        foreach ($missingMemberIds as $memberId) {
+            $recordsToInsert[] = [
+                'member_id'            => $memberId,
+                'date_month_year'      => $monthDate,
+                'is_taken'             => false,
+                'confirmed_by_user_id' => null,
+                'created_at'           => $now,
+                'updated_at'           => $now,
+            ];
+        }
+
+        // Chunk insertions for large datasets to prevent MySQL packet limit overflow
+        foreach (array_chunk($recordsToInsert, 500) as $chunk) {
+            DateWhenMemberTakeHisMedical::insert($chunk);
+        }
     }
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListMonthlyTrackings::route('/'),
-            'create' => Pages\CreateMonthlyTracking::route('/create'),
-            'edit' => Pages\EditMonthlyTracking::route('/{record}/edit'),
         ];
     }
 }

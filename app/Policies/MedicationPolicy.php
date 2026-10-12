@@ -9,12 +9,12 @@ class MedicationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+       return $user->isAdmin() || $user->isMedicalOperator();
     }
 
     public function view(User $user, Medication $medication): bool
     {
-        return true;
+        return $user->isAdmin() || $user->isMedicalOperator();
     }
 
     public function create(User $user): bool

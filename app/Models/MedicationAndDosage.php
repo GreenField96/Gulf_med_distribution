@@ -13,7 +13,6 @@ class MedicationAndDosage extends Model
         'medication_id',
         'member_id',
         'amount',
-        'price',
     ];
 
     public function medication(): BelongsTo

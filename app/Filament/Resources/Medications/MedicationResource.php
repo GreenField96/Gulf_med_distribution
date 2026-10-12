@@ -45,6 +45,11 @@ class MedicationResource extends Resource
                     ->label(__('Dosages'))
                     ->sortable(),
 
+                    Tables\Columns\TextColumn::make('price')
+                    ->label(__('Price'))
+                    ->money('LYD')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
